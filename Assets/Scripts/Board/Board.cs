@@ -559,58 +559,39 @@ public class Board : MonoBehaviour
     {
         //블록들을 섞어주는 함수
 
-        ResetBoard();
+        ResetBoard();//만약 보드판에 블록이 있다면 비워주기 위해 호출하는 함수 
 
-        //모든 블록의 목적지를 Board 바깥의 값으로 바꾼 후 
-        foreach (var block in m_ListBlocksToRefill)
-        {
-            Coordinate Coord = new Coordinate(-1, -1);
-
-            switch (bNeedToDrop)
-            {
-                case true://위에서 아래로 떨어지는 효과 연출이 필요할 때 
-                    block.SetDestination(Coord, GetPosOnCoord(Coord));
-                    break;
-                case false://연출 필요 없을 때 
-                    block.Init(Coord, GetPosOnCoord(Coord));
-                    break;
-            }
-        }
-
+        //블록리스트에서 랜덤인덱스 블록을 뽑아서 빈 좌표의 처음부터 차례대로 채우는데
+        //해당 위치에 블록을 놓았을 때 매치가 되는지 검사가 필요함
+        //-> 매치가 되면 블록을 다시 뽑아야하고 되지 않으면 배치하면 됨
         for (int i = 0; m_ListCoordOnBoard.Count > i;)
         {
             int iRandomIndex = Random.Range(0, m_ListBlocksToRefill.Count);
             Block CurBlock = m_ListBlocksToRefill[iRandomIndex];
             Coordinate CurCoord = m_ListCoordOnBoard[i];
 
+            if (InspectHorizon(CurBlock.tag, CurCoord) || InspectVertical(CurBlock.tag, CurCoord))
+            {
+                m_ListMatchedBlocks.Clear();//매칭 검사가 끝나면 다음 검사를 위해 매치된 블록들을 저장하는 리스트를 비워준다. 
+                continue;
+            }
+
             switch (bNeedToDrop)
             {
-                //블록리스트에서 랜덤인덱스 블록을 뽑아서 빈 좌표의 처음부터 차례대로 채우는데
-                //랜덤으로 뽑은 블록이 이미 앞에 배치된 블록인지 확인이 필요함
-                //-> 블록리스트에서 현재 순서 좌표를 가진 블록이 있는지 중복검사가 필요함-> 중복되면 블록 다시 뽑기 
-                //-> 위 검사에서 통과되면 해당 위치에 블록을 놓았을 때 매치가 되는지 검사가 필요함
-                //-> 매치가 되면 블록을 다시 뽑아야하고 되지 않으면 배치하면 됨 
-                case true:
-                    if (m_ListBlocksOnBoard.Exists((obj) => obj.CoordDestination.Equals(CurCoord))
-                        || InspectHorizon(CurBlock.tag, CurCoord) || InspectVertical(CurBlock.tag, CurCoord))
-                        continue;
-
-                    m_ListMatchedBlocks.Clear();
-
+                //블록이 섞이는 함수가 호출되는 상황은 게임을 새로 시작할 때와
+                //게임 플레이 중 이동 가능한 블록이 없어 섞어줘야 하는 상황인데 두 경우 애니메이션 연출만 다르다.
+                //함수를 재사용할 수 있도록 bool 매개변수를 이용한다. 
+                case true://아래로 드롭되는 연출이 필요할 경우 배치될 위치를 목적지로 설정해준다. 
                     CurBlock.SetDestination(CurCoord, GetPosOnCoord(CurCoord));
                     break;
-                case false:
-                    if (m_ListBlocksOnBoard.Exists((obj) => obj.Coord.Equals(CurCoord))
-                        || InspectHorizon(CurBlock.tag, CurCoord) || InspectVertical(CurBlock.tag, CurCoord))
-                        continue;
-
-                    m_ListMatchedBlocks.Clear();
-
+                case false://드롭 연출이 필요없는 경우 블록의 초기 위치로 설정해준다. 
                     CurBlock.Init(CurCoord, GetPosOnCoord(CurCoord));
                     break;
             }
 
+            //위의 과정을 통과해서 블록이 보드판에 배치되면 활성화 
             CurBlock.gameObject.SetActive(true);
+            //보드판 배열에 블록을 추가하고 Refill List에서는 해당 블록을 삭제한다. 
             m_ListBlocksOnBoard.Add(CurBlock);
             m_ListBlocksToRefill.Remove(CurBlock);
             i++;
